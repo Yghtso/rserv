@@ -1,14 +1,16 @@
 pub struct Listener {
-    listener_thread: std::thread::JoinHandle<()>,
+    pub listener_thread: std::thread::JoinHandle<()>,
     socket: std::net::TcpListener,
 }
 
 impl Listener{
-    pub fn run(port: u16) -> Listener {
+
+    pub fn new(port: u16, receiver: std::sync::mpsc::Receiver<bool>) -> Listener {
 
         let self_host = format!("127.0.0.1:{}", port);  
         let handle = std::thread::spawn(move || {
-            Listener::handle_income_connections();
+            let msg_received = receiver.recv().unwrap();
+            print!("MAIN THREAD IN ESECUZIONE");
         });
 
         Listener {
@@ -17,9 +19,10 @@ impl Listener{
         }
     }
 
-    fn handle_income_connections() {
-        //for stream in .incoming() {
-        //    handle_client(stream?);
-        //}
+    fn handle_income_connections(&self) {
+        match self.socket.accept() {
+            Ok((socket, addr)) => println!("new client: {addr:?}"),
+            Err(e) => println!("couldn't get client: {e:?}"),
+        }
     }
 }

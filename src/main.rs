@@ -1,15 +1,10 @@
 mod rservs;
-use std::net::TcpListener;
 fn main() {
-    
-    // let master_thread: rservs::master::Listener = rservs::master::Listener::run(80);
 
-    // let _ = master_thread.listener_thread.join();
+    let (tx, rx) = std::sync::mpsc::channel::<bool>();
+    let master_listener_thread = rservs::master::Listener::new(30000,rx);
 
-    let listener = TcpListener::bind("192.168.1.10:8080").unwrap();
+    //tx.send(true).unwrap();
 
-    match listener.accept() {
-        Ok((_socket, addr)) => println!("new client: {addr:?}"),
-        Err(e) => println!("couldn't get client: {e:?}"),
-    }
+    master_listener_thread.listener_thread.join().unwrap();
 }
