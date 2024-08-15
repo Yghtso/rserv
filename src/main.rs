@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 mod rservs;
 fn main() {
 
@@ -16,8 +18,12 @@ fn main() {
     start_list_thread_tx.send(true).unwrap();
 
     loop {
-        let (stream, addr): (std::net::TcpStream, std::net::SocketAddr) = sessions_rx.try_recv().expect("Errore nel ricevere il messaggio dal listener thread");
+        let msg = sessions_rx.try_recv();
         
+        match msg {
+            Ok(msg) => println!("new client: {}", msg.1),
+            Err(e) => (),
+        }
     }
 
     master_listener_thread.listener_thread.unwrap().join().unwrap();
