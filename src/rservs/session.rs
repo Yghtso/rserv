@@ -1,26 +1,23 @@
-use std::thread::JoinHandle;
-
 pub struct Client {
-    session_thread: std::thread::JoinHandle<()>,
-    socket: std::net::TcpStream,
+    pub session_thread: Option<std::thread::JoinHandle<()>>,
+    pub stream: Option<std::sync::Arc<std::sync::Mutex<std::net::TcpStream>>>,
 }
 
 impl Client {
-    pub fn run(valid_tcp_connection: std::net::TcpStream) -> (JoinHandle<()>, Client) {
-        (
-            std::thread::spawn(move || {
-            Client::handle_connection();}),
-            
-            Client {
-                session_thread: std::thread::spawn(move || {
-                    Client::handle_connection();
-                }),
-                socket: valid_tcp_connection,
-            }
-        )
-    }
+    pub fn new(tcp_stream: std::net::TcpStream, start_receiver: std::sync::mpsc::Receiver<bool>) -> Client {
+        let stream: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>> = std::sync::Arc::new(std::sync::Mutex::new(tcp_stream));
 
-    fn handle_connection() {
-        
+        let stream_clone = std::sync::Arc::clone(&stream);
+
+        let handle: std::thread::JoinHandle<()> = std::thread::spawn(move || {
+            start_receiver.recv().unwrap();
+
+            
+        });
+
+        Client {
+            session_thread: Some(handle),
+            stream: Some(stream),
+        }
     }
 }

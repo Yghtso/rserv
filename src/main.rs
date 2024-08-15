@@ -10,13 +10,15 @@ fn main() {
     // channel to comunicate the incoming connections
     let (sessions_tx, sessions_rx) = std::sync::mpsc::channel();  
 
-
     // istantiating the Listener thread
     let master_listener_thread = rservs::master::Listener::new(30000, start_list_thread_rx, sessions_tx);
     // starting the thread
     start_list_thread_tx.send(true).unwrap();
 
-    
+    loop {
+        let (stream, addr): (std::net::TcpStream, std::net::SocketAddr) = sessions_rx.try_recv().expect("Errore nel ricevere il messaggio dal listener thread");
+        
+    }
 
     master_listener_thread.listener_thread.unwrap().join().unwrap();
 

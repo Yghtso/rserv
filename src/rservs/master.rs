@@ -2,7 +2,7 @@ pub struct Listener {
     // thread that shares a socket Arc(Atomic reference count)
     pub listener_thread: Option<std::thread::JoinHandle<()>>,
     // socket that listens for income connections
-    pub socket: Option<std::sync::Arc<std::sync::Mutex<std::net::TcpListener>>>,
+    pub listener: Option<std::sync::Arc<std::sync::Mutex<std::net::TcpListener>>>,
 }
 
 impl Listener {
@@ -24,19 +24,25 @@ impl Listener {
         let handle: std::thread::JoinHandle<()> = std::thread::spawn(move || {
             start_receiver.recv().unwrap();
 
-            let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.try_lock().unwrap();
-            match sock.accept() {
-                Ok((socket, addr)) => {
-                    let connection = (socket, addr);
-                    session_streams_transmitter.send(connection);
+            loop {
+                let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.try_lock().unwrap();
+
+                match sock.accept() {
+                    Ok((socket, addr)) => {
+                        let connection = (socket, addr);
+                        session_streams_transmitter.send(connection).expect("Error, the socket can't be trasmitted to the main thread");
+                    }
+                    Err(e) => println!("Error getting the client: {e:?}"),
                 }
-                Err(e) => println!("couldn't get client: {e:?}"),
+                // dropped explicitly the lock to be able to read 
+                // from the socket by the main thread
+                std::mem::drop(sock);
             }
         });
 
         Listener {
             listener_thread: Some(handle),
-            socket: Some(sock),
+            listener: Some(sock),
         }
     }
 }
