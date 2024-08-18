@@ -4,6 +4,7 @@ pub struct Client {
 }
 
 impl Client {
+
     pub fn new(tcp_stream: std::net::TcpStream, start_receiver: std::sync::mpsc::Receiver<bool>) -> Client {
         let stream: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>> = std::sync::Arc::new(std::sync::Mutex::new(tcp_stream));
 
@@ -12,7 +13,8 @@ impl Client {
         let handle: std::thread::JoinHandle<()> = std::thread::spawn(move || {
             start_receiver.recv().unwrap();
 
-            
+            let stream = stream_clone.lock().unwrap();
+            println!("[+] Spawnato un nuovo client, CONNESSIONE A : {}", stream.peer_addr().unwrap());
         });
 
         Client {
