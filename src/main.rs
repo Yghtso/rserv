@@ -1,9 +1,7 @@
-use std::net::SocketAddr;
-
 mod rservs;
 fn main() {
 
-    let sessions: Vec<rservs::session::Client> = Vec::new();
+    let mut sessions: Vec<(rservs::session::Client, std::sync::mpsc::Sender<bool>)> = Vec::new();
 
     // creating the channels for the Listener thread and the main thread
 
@@ -18,14 +16,18 @@ fn main() {
     start_list_thread_tx.send(true).unwrap();
 
     loop {
-        let msg = sessions_rx.try_recv();
+        let stream = sessions_rx.try_recv();
         
-        match msg {
-            Ok(msg) => println!("new client: {}", msg.1),
+        match stream {
+            Ok(stream) => {
+                let (session_start_tx, session_start_rx) = std::sync::mpsc::channel::<bool>();
+                sessions.push((rservs::session::Client::new(stream, session_start_rx), session_start_tx));
+
+                let (client, tx) = sessions.last().unwrap();
+                tx.send(true);
+                println!("{}", sessions.len());
+            }
             Err(e) => (),
         }
     }
-
-    master_listener_thread.listener_thread.unwrap().join().unwrap();
-
 }
