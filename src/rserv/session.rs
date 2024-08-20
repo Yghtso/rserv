@@ -22,4 +22,8 @@ impl Client {
             stream: Some(stream),
         }
     }
+
+    fn handle_client() {
+        
+    }
 }
