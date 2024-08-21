@@ -1,29 +1,61 @@
 pub struct Client {
-    pub session_thread: Option<std::thread::JoinHandle<()>>,
-    pub stream: Option<std::sync::Arc<std::sync::Mutex<std::net::TcpStream>>>,
+    pub session_thread: std::thread::JoinHandle<()>,
+    pub stream: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>>,
+    pub status: std::sync::Arc<std::sync::Mutex<super::ThreadStatus>>,
 }
 
 impl Client {
 
-    pub fn new(tcp_stream: std::net::TcpStream, start_receiver: std::sync::mpsc::Receiver<bool>) -> Client {
-        let stream: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>> = std::sync::Arc::new(std::sync::Mutex::new(tcp_stream));
+    pub fn new(tcp_stream: std::net::TcpStream, session_control_receiver: std::sync::mpsc::Receiver<bool>) -> Client {
+        let stream = 
+            std::sync::Arc::new(
+            std::sync::Mutex::new(tcp_stream));
 
-        let stream_clone = std::sync::Arc::clone(&stream);
+        let status = 
+            std::sync::Arc::new(
+            std::sync::Mutex::new(
+            super::ThreadStatus::Blocked));
 
-        let handle: std::thread::JoinHandle<()> = std::thread::spawn(move || {
-            start_receiver.recv().unwrap();
 
-            let stream = stream_clone.lock().unwrap();
-            println!("[+] Spawnato un nuovo client, CONNESSIONE A : {}", stream.peer_addr().unwrap());
-        });
+        let stream_clone: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>> = std::sync::Arc::clone(&stream);
+        let status_clone = std::sync::Arc::clone(&status);
+
+        let handle: std::thread::JoinHandle<()> = std::thread::Builder::new()
+        .name(format!("[CLIENT #{}]", 1).into())
+        .spawn(move || {
+            loop {
+                // TODO : error handling 
+                let status = status_clone.lock().unwrap();
+                match *status {
+
+                    super::ThreadStatus::Blocked => {
+                    
+                        let result = session_control_receiver.try_recv();
+                    
+                        match result {
+                            Ok(starting) => if starting { break; },
+                            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                                println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
+                            }
+                            _ => (), 
+                        }
+                    }
+
+                    super::ThreadStatus::Running => {
+
+                        // TODO : implement this
+                    }
+
+                }
+            }
+            let stream: std::sync::MutexGuard<std::net::TcpStream> = stream_clone.lock().unwrap();
+            println!("[ + ] [CLIENT] Spawnato un nuovo client, CONNESSIONE A : {}", stream.peer_addr().unwrap());
+        }).expect("[ - ] [MAIN] Error a new [CLIENT] thread can' t be created");
 
         Client {
-            session_thread: Some(handle),
-            stream: Some(stream),
+            session_thread: handle,
+            stream: stream,
+            status: status,
         }
-    }
-
-    fn handle_client() {
-        
     }
 }
