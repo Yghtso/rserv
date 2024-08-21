@@ -31,14 +31,39 @@ impl Server {
         self
     }
 
-    pub fn run(& self) {
+    pub fn run(mut self) -> Option<Self>{
         if self.listener.is_none() || self.listener_control_tx.is_none() || self.sessions_rx.is_none() {
-            println!("[ - ] Error, the server was trying to start but some necessary fields weren' t initialized");
-            return;
+            println!("[ - ] [MAIN] Error, the server was trying to start but some necessary fields weren' t initialized");
+            return None;
         }
 
+        self.listener_control_tx.as_ref().unwrap().send(true).expect("[ - ] [MAIN] Error, the [LISTENER] thread can't be started");
+        
         loop {
-            
+            let result = self.sessions_rx.as_ref().unwrap().try_recv();
+            match result {
+                Ok(socket) => {
+                    let (session_control_tx, session_control_rx) = std::sync::mpsc::channel::<bool>();
+                    let client: session::Client = session::Client::new(socket, session_control_rx);
+                    self.sessions.push((client, session_control_tx));
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
+                }
+                _ => {}
+            }
         }
+        
+        Some(self)
     }
+}
+
+enum ThreadStatus {
+
+    // Actively executing task
+    Running, 
+
+    // Execution paused 
+    Blocked,
+
 }
