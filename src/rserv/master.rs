@@ -1,41 +1,65 @@
 pub struct Listener {
-    pub listener_thread: Option<std::thread::JoinHandle<()>>,
-    pub listener: Option<std::sync::Arc<std::sync::Mutex<std::net::TcpListener>>>,
+    pub listener_thread: std::thread::JoinHandle<()>,
+    pub listener: std::sync::Arc<std::sync::Mutex<std::net::TcpListener>>,
+    pub status: std::sync::Arc<std::sync::Mutex<super::ThreadStatus>>,
 }
 
 impl Listener {
 
 pub fn new(addr: std::net::SocketAddr, listener_control_rx: std::sync::mpsc::Receiver<bool>, sessions_tx: std::sync::mpsc::Sender<std::net::TcpStream>) -> Listener {
-        
-        let self_host = addr;  
-        let sock: std::sync::Arc<std::sync::Mutex<std::net::TcpListener>> = 
+          
+        let sock = 
             std::sync::Arc::new(
             std::sync::Mutex::new(
-            std::net::TcpListener::bind(self_host).expect("[ - ] [LISTENER] Cannot bind the given address to the server")));
+            std::net::TcpListener::bind(addr).expect("[ - ] [LISTENER] Cannot bind the given address to the server")));
+
+        let status = 
+            std::sync::Arc::new(
+            std::sync::Mutex::new(
+            super::ThreadStatus::Blocked));
+        
+        // clone for the Arc move in the thread to own them
         let sock_clone = std::sync::Arc::clone(&sock);
+        let status_clone = std::sync::Arc::clone(&status);
         
         let handle: std::thread::JoinHandle<()> = std::thread::Builder::new()
         .name("[LISTENER]".into())
         .spawn(move || {
-            while listener_control_rx.recv().expect("[ - ] [LISTENER] Error starting the [LISTENER] thread") {}
-            
-            loop {
-                let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.lock().unwrap();
-
-                match sock.accept() {
-                    Ok((socket, _addr)) => {
-                        sessions_tx.send(socket).expect("[ - ] Error, the client socket can't be trasmitted to the main thread");
+            loop { 
+                // TODO : error handling 
+                let result = listener_control_rx.try_recv();
+                let change_state = match result {
+                    Ok(signal) => if signal { true; },
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
+                        false;
                     }
-                    Err(e) => println!("[ - ] Error getting the client connection: {e:?}"),
-                }
-                std::mem::drop(sock);
-                
+                    _ => (), 
+                };
+                    
+                let status = status_clone.lock().unwrap();
+                match *status {
+
+                    super::ThreadStatus::Blocked => (),
+                    super::ThreadStatus::Running => {
+
+                        let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.lock().unwrap();
+
+                        match sock.accept() {
+                            Ok((socket, _addr)) => {
+                                sessions_tx.send(socket).expect("[ - ] [LISTENER] Error, the client socket can't be trasmitted to the main thread");
+                            }
+                            Err(e) => println!("[ - ] [LISTENER] Error getting the client connection: {e:?}"),
+                        }
+                    }
+                }        
             }
-        }).expect("[ - ] Error the listener thread can' t be created");
+        }).expect("[ - ] [MAIN] Error the [LISTENER] thread can' t be created");
 
         Listener {
-            listener_thread: Some(handle),
-            listener: Some(sock),
+            listener_thread: handle,
+            listener: sock,
+            status: status,
         }
     }
 }
