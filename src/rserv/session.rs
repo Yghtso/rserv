@@ -14,7 +14,7 @@ impl Client {
         let status = 
             std::sync::Arc::new(
             std::sync::Mutex::new(
-            super::ThreadStatus::Blocked));
+            super::ThreadStatus::Running));
 
 
         let stream_clone: std::sync::Arc<std::sync::Mutex<std::net::TcpStream>> = std::sync::Arc::clone(&stream);
@@ -25,30 +25,31 @@ impl Client {
         .spawn(move || {
             loop {
                 // TODO : error handling 
-                let status = status_clone.lock().unwrap();
+                let result = session_control_receiver.try_recv();
+                let change_state = match result {
+                    Ok(signal) => signal,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
+                        false
+                    }
+                    _ => false,
+                };
+
+                let mut status = status_clone.lock().unwrap();
                 match *status {
 
-                    super::ThreadStatus::Blocked => {
-                    
-                        let result = session_control_receiver.try_recv();
-                    
-                        match result {
-                            Ok(starting) => if starting { break; },
-                            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                                println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
-                            }
-                            _ => (), 
-                        }
-                    }
+                    super::ThreadStatus::Blocked => if change_state {*status = super::ThreadStatus::Running},
 
                     super::ThreadStatus::Running => {
-
+                        let stream: std::sync::MutexGuard<std::net::TcpStream> = stream_clone.lock().unwrap();
+                        
                         // TODO : implement this
+
+                        if change_state {*status = super::ThreadStatus::Blocked};
                     }
 
                 }
             }
-            let stream: std::sync::MutexGuard<std::net::TcpStream> = stream_clone.lock().unwrap();
         }).expect("[ - ] [MAIN] Error a new [CLIENT] thread can' t be created");
 
         Client {
