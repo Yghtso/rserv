@@ -49,13 +49,12 @@ impl Client {
                 }
             }
             let stream: std::sync::MutexGuard<std::net::TcpStream> = stream_clone.lock().unwrap();
-            println!("[ + ] [CLIENT] Spawnato un nuovo client, CONNESSIONE A : {}", stream.peer_addr().unwrap());
         }).expect("[ - ] [MAIN] Error a new [CLIENT] thread can' t be created");
 
         Client {
             session_thread: handle,
-            stream: stream,
-            status: status,
+            stream,
+            status,
         }
     }
 }
