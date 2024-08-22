@@ -29,20 +29,20 @@ pub fn new(addr: std::net::SocketAddr, listener_control_rx: std::sync::mpsc::Rec
                 // TODO : error handling 
                 let result = listener_control_rx.try_recv();
                 let change_state = match result {
-                    Ok(signal) => if signal { true; },
+                    Ok(signal) => signal,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                         println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
-                        false;
+                        false
                     }
-                    _ => (), 
+                    _ => false, 
                 };
                     
-                let status = status_clone.lock().unwrap();
+                let mut status = status_clone.lock().unwrap();
                 match *status {
 
-                    super::ThreadStatus::Blocked => (),
+                    super::ThreadStatus::Blocked => { if change_state {*status = super::ThreadStatus::Running}},
                     super::ThreadStatus::Running => {
-
+                        
                         let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.lock().unwrap();
 
                         match sock.accept() {
@@ -51,8 +51,9 @@ pub fn new(addr: std::net::SocketAddr, listener_control_rx: std::sync::mpsc::Rec
                             }
                             Err(e) => println!("[ - ] [LISTENER] Error getting the client connection: {e:?}"),
                         }
+                        if change_state {*status = super::ThreadStatus::Blocked};
                     }
-                }        
+                }
             }
         }).expect("[ - ] [MAIN] Error the [LISTENER] thread can' t be created");
 
