@@ -34,13 +34,13 @@ pub fn new(addr: std::net::SocketAddr, listener_control_rx: std::sync::mpsc::Rec
                         println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
                         false
                     }
-                    _ => false, 
+                    _ => false,
                 };
                     
                 let mut status = status_clone.lock().unwrap();
                 match *status {
 
-                    super::ThreadStatus::Blocked => { if change_state {*status = super::ThreadStatus::Running}},
+                    super::ThreadStatus::Blocked => if change_state {*status = super::ThreadStatus::Running},
                     super::ThreadStatus::Running => {
                         
                         let sock: std::sync::MutexGuard<std::net::TcpListener> = sock_clone.lock().unwrap();

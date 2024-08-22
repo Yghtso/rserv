@@ -48,7 +48,6 @@ impl Server {
                     let (session_control_tx, session_control_rx) = std::sync::mpsc::channel::<bool>();
                     let client: session::Client = session::Client::new(socket, session_control_rx);
                     self.sessions.push((client, session_control_tx));
-                    println!("[ + ] [MAIN] Spawnato un nuovo client");
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     println!("[ - ] [MAIN] Error, the comunication between [MAIN] and [LISTENER] threads is interrupted");
